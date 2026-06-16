@@ -1,0 +1,28 @@
+safesite/
+venv/
+.venv/
+env/
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Local Vector Databases & Model Weights
+rag_engine/vector_store/*
+!rag_engine/vector_store/.gitkeep
+cv_pipeline/models/*
+!cv_pipeline/models/.gitkeep
+audio_analyzer/models/*
+!audio_analyzer/models/.gitkeep
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Environment Variables / Credentials
+.env
+EOF
