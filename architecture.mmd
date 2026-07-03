@@ -1,0 +1,75 @@
+graph TD
+    %% ── STYLES ──────────────────────────────────────────────
+    classDef sensor fill:#eff6ff,stroke:#4f46e5,stroke-width:2px,color:#1e1b4b
+    classDef orch   fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    classDef cv     fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px,color:#2e1065
+    classDef audio  fill:#faf5ff,stroke:#7e22ce,stroke-width:2px,color:#3b0764
+    classDef rag    fill:#ecfeff,stroke:#0891b2,stroke-width:2px,color:#083344
+    classDef broker fill:#fdf4ff,stroke:#9333ea,stroke-width:2px,color:#4a044e
+    classDef bridge fill:#f0fdfa,stroke:#0d9488,stroke-width:2px,color:#042f2e
+    classDef hw     fill:#fff7ed,stroke:#c2410c,stroke-width:2px,color:#431407
+    classDef relay  fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#451a03
+    classDef ui     fill:#f0fdf4,stroke:#15803d,stroke-width:2px,color:#052e16
+    classDef danger fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#450a0a
+
+    %% ── SENSORS (LR: side-by-side at top) ──────────────────
+    subgraph SEN ["SENSORS — On-Machine Hardware"]
+        direction LR
+        CAM_I["IR Camera\nCabin-Facing"]:::sensor
+        CAM_E["Wide-Angle Camera\nPerimeter / Blind-Spot"]:::sensor
+        MIC["Microphone\nAudio Capture"]:::sensor
+    end
+
+    %% ── ORCHESTRATOR ────────────────────────────────────────
+    ORCH["FastAPI Orchestrator\nLoads all quantized models at boot\nManages MQTT event bus · Serves /query endpoint"]:::orch
+
+    %% ── AI STACK (TB: vertical — keeps MQTT centred below) ──
+    %% M6 is inside to preserve the 6-layer count and keep the spine straight.
+    %% M6 is HTTP-only; its connection to the dashboard is shown separately below.
+    subgraph AI ["6-LAYER AI STACK — Single Edge Node · Air-Gapped · less than 5.5 GB VRAM"]
+        direction TB
+        M1["M1: Cabin Guardian\nMediaPipe Face Mesh + 2-layer GRU (FP32)\nEAR + MAR over 30-frame rolling window\ncabin/fatigue  |  less than 10 ms  |  400 MB RAM"]:::cv
+        M23["M2+M3: Perimeter and PPE Sentinel\nYOLOv10-Nano INT8 (ONNX) — Single pass\n4 classes + monocular distance estimate\nperimeter/alert  |  30 FPS  |  1.2 GB VRAM"]:::cv
+        M4["M4: Acoustic Anomaly Detector\nYAMNet TFLite INT8 — CPU thread\nscream · glass_break · metal_grind · explosion · shout\naudio/anomaly  |  200 MB RAM  |  No GPU"]:::audio
+        M5["M5: Gesture Emergency Stop\nMediaPipe Hands + LSTM (2 layers · 64 units)\nSTOP · HELP · EMERGENCY_STOP\ngesture/trigger  |  150 MB RAM  |  Conditional on M23"]:::cv
+        M6["M6: Offline RAG Safety Assistant — HTTP only, no MQTT\nPhi-3-mini-4k-instruct INT4 (Ollama / llama.cpp) · 20 GPU layers\nChromaDB + all-MiniLM-L6-v2 (FP16) · 90 MB embeddings\nSources: Tata Safety Handbook · OSHA · JCB Manual\nHTTP /query — answer + page citation  |  RAG less than 150 ms  |  LLM more than 15 tok/s  |  3.2 GB VRAM"]:::rag
+    end
+
+    %% ── MQTT BROKER ─────────────────────────────────────────
+    MQTT["Local MQTT Broker — Eclipse Mosquitto 2.0\nlocalhost:1883 · 100% Air-Gapped · Zero Cloud Dependency"]:::broker
+
+    %% ── OUTPUT SPLIT (LR: side-by-side) ─────────────────────
+    subgraph OUT ["OUTPUT LAYER"]
+        direction LR
+        WS["WebSocket Bridge\nMQTT to JSON Stream\nws://localhost:8765\n10+ events per sec · No browser plugins"]:::bridge
+        ESP["ESP32 Actuator Node\nPubSubClient MQTT · localhost:1883\nSubscribes: actuation/emergency_stop\n  actuation/warning_strobe · actuation/reset\nPublishes: esp32/heartbeat every 2 s\nWatchdog: resets after 30 s silence"]:::hw
+    end
+
+    %% ── CONSUMERS (LR: side-by-side) ────────────────────────
+    subgraph CON ["CONSUMERS AND ACTUATION"]
+        direction LR
+        DASH["React Operator Dashboard\nReal-time Alert Feed · RAG Chatbot · Event Log"]:::ui
+        RLY["4-Ch Optocoupler Relay Board\nGPIO 16 — R1 Throttle Kill (NC Failsafe)\nGPIO 17 — R2 24V Strobe Light\nGPIO 18 — R3 24V Siren Module\nGPIO 19 — R4 Spare Brake Actuation\n5V DC control · 10A 250V contacts"]:::relay
+    end
+
+    %% ── MACHINE ─────────────────────────────────────────────
+    MCH["MACHINE INTERVENTION\nThrottle Signal Grounded · Strobe and Siren Activated\nNC relay opens on trigger — fails safe  |  less than 25 ms end-to-end"]:::danger
+
+    %% ── MAIN VERTICAL SPINE ─────────────────────────────────
+    SEN  --> ORCH
+    ORCH --> AI
+
+    %% Conditional gate (inside AI subgraph — short downward arrow)
+    M23 -->|"Person in 5m zone? Else M5 SLEEPS"| M5
+
+    %% M1, M23, M4, M5 publish to MQTT; M6 is HTTP-only
+    AI   --> MQTT
+    MQTT --> WS
+    MQTT --> ESP
+    WS   --> DASH
+    ESP  --> RLY
+    RLY  --> MCH
+
+    %% RAG query loop — HTTP, not MQTT
+    DASH -->|"HTTP POST /query"| M6
+    M6   -->|"answer + page citation"| DASH

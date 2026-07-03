@@ -1,0 +1,20 @@
+{
+  "safety_events_manifest": {
+    "module_1_fatigue": {
+      "topic": "safety/cabin/fatigue",
+      "payload": { "fatigue_score": 0.82, "micro_sleep_detected": true, "distracted": false, "latency_ms": 8.4 }
+    },
+    "module_2_and_3_vision": {
+      "topic": "safety/perimeter/sentinel",
+      "payload": { "class": "person_no_ppe", "distance_meters": 3.1, "missing_gear": ["helmet"], "box_coordinates": [124, 45, 310, 400] }
+    },
+    "module_4_acoustic": {
+      "topic": "safety/audio/anomaly",
+      "payload": { "isolated_anomaly": "structural_metal_grind", "confidence_score": 0.94, "decibel_level": 96.2 }
+    },
+    "module_5_gesture_stop": {
+      "topic": "safety/gesture/trigger",
+      "payload": { "action_sequence": "EMERGENCY_STOP", "uniqueness_score": 0.98, "execution_relay_state": "ACTIVE" }
+    }
+  }
+}

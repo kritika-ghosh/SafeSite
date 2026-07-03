@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # Local message bus for high-speed, sub-25ms telemetry routing
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: safesite-mqtt-broker
+    ports:
+      - "1883:1883"   # Standard MQTT port for ESP32/microcontroller connections
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+
+  # Core Central Orchestrator managing model inference concurrency
+  orchestrator:
+    build:
+      context: .
+      dockerfile: ./modules/Dockerfile.orchestrator
+    container_name: safesite-core-engine
+    ports:
+      - "8000:8000"   # FastAPI HTTP endpoint for RAG Manual Queries
+      - "8765:8765"   # WebSocket stream for in-cabin React Dashboard
+    volumes:
+      - ./modules:/app/modules
+      - ./models:/app/models
+    environment:
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+    depends_on:
+      - mosquitto
+    restart: unless-stopped

@@ -1,0 +1,19 @@
+# Virtual Environment (Visible as 'env' in your sidebar)
+env/
+venv/
+ENV/
+
+# Large AI/ML Model Files (To prevent hitting GitHub's 100MB file limit)
+models/
+*.gguf
+*.onnx
+
+# Python bytecode/cache (Generated automatically when you run Python apps)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Operating system files
+.DS_Store
+Thumbs.db
